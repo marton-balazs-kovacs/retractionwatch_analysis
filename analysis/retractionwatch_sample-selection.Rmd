@@ -1,0 +1,83 @@
+---
+title: "Retractiowatch project: selecting contact sample"
+author: "Marton Kovacs"
+date: "`r Sys.Date()`"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(here)
+```
+
+Loading the full Retraction Watch database provided by the Retraction Watch admins. We cannot share the database, but the following code describes our method for selecting the contact database.
+
+# Load data
+
+```{r}
+rw_database <- readxl::read_xlsx(here::here("data/source/RWDBDNLD11102022.xlsx"))
+```
+
+# Filter retracted papers due to RMD mistakes
+
+```{r}
+# Preparing terms to filter for
+filter_terms <- "Concerns/Issues About Data|Concerns/Issues About Results|Duplication of Data|Error in Analyses|Error in Data|Error in Results and/or Conclusions|Results Not Reproducible|Unreliable Data|Unreliable Results"
+
+# Filtering
+rw_filtered <-
+  rw_database %>% 
+  filter(str_detect(Reason, filter_terms))
+
+# Number of hits
+nrow(rw_filtered)
+
+# Number of papers when the retraction notice is available
+rw_filtered %>% 
+  mutate(retraction_doi_available = case_when(
+    RetractionDOI == "Unavailable" ~ 0L,
+    RetractionDOI == "unavailable" ~ 0L,
+    is.na(RetractionDOI) ~ 0L,
+    TRUE ~ 1L
+    )
+  ) %>% 
+  count(retraction_doi_available)
+
+# Check in how many instances the DOI of the original paper is available
+rw_filtered %>% 
+  mutate(original_doi_available = case_when(
+    OriginalPaperDOI == "Unavailable" ~ 0L,
+    OriginalPaperDOI == "unavailable" ~ 0L,
+    is.na(OriginalPaperDOI) ~ 0L,
+    TRUE ~ 1L
+    )
+  ) %>% 
+  count(original_doi_available)
+
+# Check in how many instances the PubMed Id of the original paper is available
+rw_filtered %>% 
+  mutate(original_pubmedid_available = case_when(
+    OriginalPaperPubMedID == 0 ~ 0L,
+    is.na(OriginalPaperPubMedID) ~ 0L,
+    TRUE ~ 1L
+    )
+  ) %>% 
+  count(original_pubmedid_available)
+```
+
+# Search for duplicates
+
+It is possible that a paper was retracted multiple times. However, we do not want to contact the same authors multiple times.
+
+```{r}
+rw_filtered_duplicates <- 
+  rw_filtered %>% 
+  group_by(Title) %>% 
+  mutate(n = n()) %>% 
+  filter(n > 1)
+```
+
+
