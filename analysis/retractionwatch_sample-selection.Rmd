@@ -11,6 +11,8 @@ editor_options:
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(here)
+
+source(here("R/utils.R"))
 ```
 
 Loading the full Retraction Watch database provided by the Retraction Watch admins. We cannot share the database, but the following code describes our method for selecting the contact database.
@@ -19,18 +21,35 @@ Loading the full Retraction Watch database provided by the Retraction Watch admi
 
 ```{r}
 rw_database <- readxl::read_xlsx(here::here("data/source/RWDBDNLD11102022.xlsx"))
+
+reason_list <- read_csv(here::here("data/source/retractionwatch_reason-list_data.csv"))
+```
+
+Rename variables since it is easier to deal with snake case variables.
+
+```{r}
+rw_database <- janitor::clean_names(rw_database)
 ```
 
 # Filter retracted papers due to RMD mistakes
 
 ```{r}
 # Preparing terms to filter for
-filter_terms <- "Concerns/Issues About Data|Concerns/Issues About Results|Duplication of Data|Error in Analyses|Error in Data|Error in Results and/or Conclusions|Results Not Reproducible|Unreliable Data|Unreliable Results"
+include_terms <- reason_list %>% 
+  filter(include == 1) %>% 
+  summarise(list = str_c(reason, collapse = "|")) %>% 
+  pull(list)
+
+exclude_terms <- reason_list %>% 
+  filter(exclude == 1) %>% 
+  summarise(list = str_c(reason, collapse = "|")) %>% 
+  pull(list)
 
 # Filtering
 rw_filtered <-
   rw_database %>% 
-  filter(str_detect(Reason, filter_terms))
+  filter(str_detect(reason, include_terms)) %>% 
+  filter(!(str_detect(reason, exclude_terms)))
 
 # Number of hits
 nrow(rw_filtered)
@@ -38,34 +57,54 @@ nrow(rw_filtered)
 # Number of papers when the retraction notice is available
 rw_filtered %>% 
   mutate(retraction_doi_available = case_when(
-    RetractionDOI == "Unavailable" ~ 0L,
-    RetractionDOI == "unavailable" ~ 0L,
-    is.na(RetractionDOI) ~ 0L,
+    retraction_doi == "Unavailable" ~ 0L,
+    retraction_doi == "unavailable" ~ 0L,
+    is.na(retraction_doi) ~ 0L,
     TRUE ~ 1L
     )
   ) %>% 
   count(retraction_doi_available)
 
 # Check in how many instances the DOI of the original paper is available
-rw_filtered %>% 
+rw_filtered <-
+  rw_filtered %>% 
   mutate(original_doi_available = case_when(
-    OriginalPaperDOI == "Unavailable" ~ 0L,
-    OriginalPaperDOI == "unavailable" ~ 0L,
-    is.na(OriginalPaperDOI) ~ 0L,
+    original_paper_doi == "Unavailable" ~ 0L,
+    original_paper_doi == "unavailable" ~ 0L,
+    is.na(original_paper_doi) ~ 0L,
     TRUE ~ 1L
     )
-  ) %>% 
-  count(original_doi_available)
+  )
+
+count(rw_filtered, original_doi_available)
 
 # Check in how many instances the PubMed Id of the original paper is available
-rw_filtered %>% 
+rw_filtered <-
+  rw_filtered %>% 
   mutate(original_pubmedid_available = case_when(
-    OriginalPaperPubMedID == 0 ~ 0L,
-    is.na(OriginalPaperPubMedID) ~ 0L,
+    original_paper_pub_med_id == 0 ~ 0L,
+    is.na(original_paper_pub_med_id) ~ 0L,
     TRUE ~ 1L
     )
-  ) %>% 
-  count(original_pubmedid_available)
+  )
+
+count(rw_filtered, original_pubmedid_available)
+
+# Check in how many instances the PubMed Id or the DOI of the original paper are available
+rw_filtered <-
+  rw_filtered %>% 
+  mutate(original_refid_available = case_when(
+    original_pubmedid_available == 1L | original_doi_available == 1L ~ 1L,
+    TRUE ~ 0L
+    )
+  )
+
+count(rw_filtered, original_refid_available)
+
+# We only look for papers where the refid is available
+rw_filtered <-
+  rw_filtered %>% 
+  filter(original_refid_available == 1L)
 ```
 
 # Search for duplicates
@@ -75,9 +114,84 @@ It is possible that a paper was retracted multiple times. However, we do not wan
 ```{r}
 rw_filtered_duplicates <- 
   rw_filtered %>% 
-  group_by(Title) %>% 
+  group_by(title) %>% 
   mutate(n = n()) %>% 
   filter(n > 1)
+
+# Number of papers with multiple retractions
+distinct(rw_filtered_duplicates, title) %>% 
+  nrow()
+
+# Filter out the duplicates
+rw_filtered <-
+  rw_filtered %>% 
+  distinct(title, .keep_all = TRUE)
 ```
 
+There are `r nrow(rw_filtered)` papers in our sample after exclusion.
+
+```{r}
+# Save pubmed id for email extraction
+write_csv(select(rw_filtered, original_paper_pub_med_id), here("data/source/retractionwatch_pubmed-list_data.csv"))
+
+# Save data for Ziga's DOIscrape python code
+# Split the data into pieces so we can work with smaller batches in a controlled way
+doiscrape_data <-
+  rw_filtered %>% 
+  select(original_paper_doi) %>% 
+  filter(original_paper_doi %ni% c("unavailable", "Unavailable") & !is.na(original_paper_doi))
+
+# Loop through dataframe and save in batches of 1000
+for (i in seq(1, nrow(doiscrape_data), 1000)) {
+  # create filename with row index range
+  filename <- paste0("retractionwatch_doi-list_", i, "-", min(i+999, nrow(doiscrape_data)), "_data", ".csv")
+  
+  # create subset of dataframe with 1000 rows
+  subset <- doiscrape_data %>% slice(i:min(i+999, nrow(doiscrape_data)))
+  
+  # save subset as CSV file
+ write_csv(subset, here(paste0("data/source/doiscrape_list", filename)))
+}
+```
+
+# Save sample
+
+```{r}
+write_csv(rw_filtered, here("data/source/retractionwatch_sample_data.csv"))
+```
+
+# Checking scarped email addresses
+
+We used the DOIscrape [https://github.com/marton-balazs-kovacs/DOIscrape](https://github.com/marton-balazs-kovacs/DOIscrape) function to scrape email addresses from the web based on the DOIs of the retracted papers. Now we check the results of the initial extraction.
+
+```{r}
+doiscrape_results_data <- read_plus(pattern = ".csv", path = here("data/source/"), subfolder_name = "doiscrape_data", sep = ",")
+
+# Count the number of cases where there was an error in the extraction
+doiscrape_error <- 
+  doiscrape_results_data %>% 
+  filter(!is.na(message))
+
+nrow(doiscrape_error)
+
+# List the different errors
+doiscrape_error %>% 
+  count(message) %>% View()
+
+# Count results with extracted email addresses
+doiscrape_email <-
+  doiscrape_results_data %>% 
+  filter(is.na(message) & emails != "[]")
+
+nrow(doiscrape_email)
+
+# Read the email addresses mined by Bence Bakos based on pubmed ids
+pubmed_data_bb <- read_csv(here("data/source/retractionwatch_pubmed_bb_data.csv"))
+
+# Compare the pubmed id data to doiscrape results
+doi_pubmed <- inner_join(doiscrape_email, pubmed_data_bb, by = "doi")
+
+anti_join(pubmed_data_bb, doiscrape_email, by = "doi") %>% nrow()
+anti_join(pubmed_data_bb, doiscrape_results_data, by = "doi") %>% nrow()
+```
 

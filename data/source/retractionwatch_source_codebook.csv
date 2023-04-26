@@ -1,0 +1,60 @@
+variable_name,description,variable_type
+StartDate,Start Date,character
+EndDate,End Date,character
+Status,Response Type,character
+Progress,Progress,character
+Duration (in seconds),Duration (in seconds),character
+Finished,Finished,character
+RecordedDate,Recorded Date,character
+ResponseId,Response ID,character
+DistributionChannel,Distribution Channel,character
+UserLanguage,User Language,character
+consent,"We found your paper in the Retraction Watch database (http://retractiondatabase.org/) and we would like to ask 5 short questions about the mistakes that you identify behind this unfortunate event.  
+
+
+
+In this study, we examine the types and causes of data management mistakes made in retracted social science papers. Our survey aims to help researchers by highlighting those honest mistakes that can potentially lead to retractions.
+
+
+
+We value your time so we tried to make this survey as short as possible. Completing the survey takes an average of 3 minutes.
+
+
+
+We link your answers to the retracted paper only for analytical purposes. Neither the title of the paper nor any information on the authors of the retracted paper will be shared publicly. Only your survey responses and the reasons behind the retraction will be made publicly available in a way that they cannot be linked to you.
+
+
+
+I hereby declare that I have understood and accept the information given above and in the detailed informed consent form (https://osf.io/3sc46), and I give my consent to participate in this survey as well as to the processing of all the data I provide and to share my anonymous responses.
+
+ 
+Marton Kovacs, ELTE University, Hungary
+
+Russell Poldrack, Stanford University, USA
+
+ 
+
+Contact:
+
+kovacs.marton@ppk.elte.hu
+
+The OSF page of the project: https://osf.io/v7fc2/",character
+reason_mistake,"To what degree was the retraction of your work, mentioned in our email, caused by data management mistakes?",character
+mistake_type,"Which of the following data management mistake type contributed the most to the retraction of your paper?
+
+ 
+
+If you need an explanation for some of these labels, examples of the response options can be found next to each option in parentheses. - Selected Choice",character
+mistake_type_21_TEXT,"Which of the following data management mistake type contributed the most to the retraction of your paper?
+
+ 
+
+If you need an explanation for some of these labels, examples of the response options can be found next to each option in parentheses. - Other, please specify: - Text",character
+mistake_cause,"What was the main cause of the data management mistake you identified above?
+If you need an explanation for some of these labels, examples of the response options can be found next to each option in parentheses. - Selected Choice",character
+mistake_cause_16_TEXT,"What was the main cause of the data management mistake you identified above?
+If you need an explanation for some of these labels, examples of the response options can be found next to each option in parentheses. - Other, please specify: - Text",character
+stress,How much stress did you experience due to the retraction of the article?,character
+workflow,Did you change anything in your research workflow because of the retraction?,character
+experience,Is there anything else that you would like to share about your experience with the retraction?,character
+comment,"Here, you can leave any comments on the project or lessons learned that you would like to share. Please add your email address here if you would be open to a more in-depth chat about your experience.",character

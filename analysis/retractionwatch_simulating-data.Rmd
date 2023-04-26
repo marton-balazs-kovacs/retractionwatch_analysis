@@ -1,0 +1,172 @@
+---
+title: "Retractiowatch project: Simulating data"
+author: "Marton Kovacs"
+date: "`r Sys.Date()`"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(here)
+library(lubridate)
+
+set.seed(42)
+
+# Source R scripts
+r_scripts <- list.files(here::here("R/"), full.names = TRUE)
+purrr::walk(r_scripts, source)
+```
+
+For the preregistration we will simulate a source datafile to prepare and register the analysis scripts. For the generation of the datafile we are using two test responses to the survey on Qulatrics to ensure that the datafile structure and variable names are similar to the actual dataset.
+
+We will only prepare the source datafile by simulation. Any other modifications will be done by the analysis scripts.
+
+# Load data
+
+```{r}
+source <- read_csv(here("data/simulation/retractionwatch_survey_April+19,+2023_13.04.csv"))
+```
+
+# Create codebook
+
+For the source datafile we will create a codebook based on the Qualtrics datafile before we simulate additional data. Qulatrics records meta information on each variable in the first two rows of the datafile. We will use this as a starting point to generate the codebook.
+
+```{r}
+codebook <-
+  source %>% 
+  slice(1) %>% 
+  pivot_longer(cols = everything(), names_to = "variable_name", values_to = "description") %>% 
+  mutate(
+    # Since all columns will be character when downloaded from Qulatrics the variable type will be the same everywhere
+    variable_type = "character"
+    )
+
+# Save the codebook
+readr::write_csv(codebook, here("data/source/retractionwatch_source_codebook.csv"))
+```
+
+# Simulate new responses
+
+```{r}
+# Number of simulated participants
+n <- 200
+
+# Mistake type response options
+mistake_types <- c(
+  "Ambiguous naming/defining of data (e.g. ambiguous naming, inconsistent identifier, incorrect labeling,  non- transparent naming, poor labeling of variables)",
+  "Incorrect connection between data points (e.g. error in tracking status of participants, failure to connect participant to data, ID duplication, mistake in connecting participants to responses, unable to track recorded data)",
+  "Insufficient or incorrect documentation (e.g. lack of documentation, poor documentation, not recorded metadata, ambiguous value coding protocol, data logging mistake)",
+  "Data coding error (e.g. incorrect coding of variables, misclassification of values, mistake in coding variables, mistake in recording variables, value coding error)",
+  "Data input error (e.g. data entry error, error in recording data, failure to record responses, mistake in data recording, value input error)",
+  "Data or file organization error (e.g. inconsistent file structure, mistake in data structure, storing data in wrong format, misaligned rows in data, coding manual hard to decipher)",
+  "Data selection/merging error (e.g. selecting wrong sample for analysis, analyzing the wrong variable, data integration error, subsetting error, including people who do not belong to the sample)",
+  "Data transfer error (e.g. data insertion mistake, transcription error, incomplete data transfer, mistake in transferring data between formats, importing data from survey platform)",
+  "Deviation from the protocol (e.g. not following protocol, recording data not according to protocol, using non-standard script, mistake in following protocol)",
+  "Loss of materials/documentation/data (e.g. data loss, failure to backup, failure to save data, data archiving mistake, mistake in saving results)",
+  "Oversight in study design or measurement (e.g. ambiguous wording of items, failure to include survey items, inconsistent scoring, incorrect wording of question/item, leaving out questionnaire items)",
+  "Participant allocation error (e.g. assigning participant to wrong group, error in randomization of the conditions, experimental condition incorrectly assigned, mistake in scheduling data collection, subject allocation mistake)",
+  "Programming error (e.g. analysis code error, error in scipt, mistake in ecperiment code, mistake in programming the data collection code, program coding error)",
+  "Project management error (error in time management; miscommunication; not showing up for data collection; team member left the lab)",
+  "Technical/infrastructural problem (e.g. recording device not recording properly, failure of data collection software, technical failure, software error, technical issue with computer in recording)",
+  "Version control error (e.g. failure to locate original data, overwriting data, overwriting files, using the wrong version of code, using the wrong version of data)",
+  "Sharing confidential data (e.g. compromising participants’ anonimity, failure to anonymize participants, not anonymizing data, privacy breach, recording data without ethical permission)",
+  "Incorrect data processing/analysis (e.g. calculating wrong statistic, mistake in data analysis, incorrect application of formulas, formula error, statistical error)",
+  "Incorrect reporting (e.g. misreporting values, plotting mistake, presenting inaccurate data, publishing with errors, reporting wrong data)",
+  "Incorrect software or hardware settings (e.g. allowing missing data in survey, failure to calibrate data collector equipment, wrong settings in experimental program, wrong software settings)",
+  "Other, please specify:"
+  )
+
+# Mistake causes response options
+mistake_causes <- c(
+  "Bad or lack of planning (e.g. error in planning, insufficient planning, lack of sufficient planning, lack of systematicity, short-sightedness)",
+  "Bad or lack of standards (e.g. bad routines, error in coding protocol, error in data organization, inconsistent file naming, insufficient procedures)",
+  "Bad skill management (e.g. improper training, inadequate training, insufficient training, insufficient training of coders, lack of training)",
+  "Carelessness (e.g. negligence, not following protocol, not taking the task seriously, lack of effort, lack of motivation)",
+  "Inattention (e.g. accident, accidental mistakes, being distracted, copy and paste error, lapse of concentration)",
+  "Lack of control (e.g. automatic thinking, inpatience, insufficient concentration, lack of discipline, not enough control) l",
+  "Lack of knowledge/experience (e.g. being unaware of the potentials of the negative outcomes, inexperience, insufficient experience, insufficient skills, lack of experience, lack of routine)",
+  "Miscommunication (e.g. lack of communication, lack of consultation, misinformation, misinformed by third party, poor collaboration)",
+  "Overconfidence (e.g. being too ambitious, being too confident, failure to anticipate the difficulty of interpreting datafiles, overreliance, too high expectations)",
+  "Physical and/or mental constraints (e.g. confusion, distraction, erroneous reasoning, forgetfulness, mental error, stress)",
+  "Project management issue (e.g. disorganization, error in team management, lack of clear job responsibilities, lack of coordination, lack of supervision)",
+  "Risking human error (e.g. experimenter error; lack of automatization; manual task handling instead of code; manually doing a task; multitasking)",
+  "Technical issue (e.g. computer issue, equipment failure, software error, technical malfunction, wrong equipment settings)",
+  "Time pressure (e.g. being in a rush, haste, insufficient time spent on the project, overworking, too big workload)",
+  "Too high complexity (e.g. difficult task, difficulty in file management, lack of easy to use tools, too complex)",
+  "Other, please specify:"
+  )
+
+# Stress response options
+stress <- c("no stress at all 0" , "1" , "2" , "3" , "4" , "5" , "6 extreme stress")
+
+source_sim <-
+  tibble(
+    email = map_chr(seq_len(n), ~ paste0(stringi::stri_rand_strings(1, 5), "@", stringi::stri_rand_strings(1, 5)), ".com"),
+    StartDate = sample(seq(from = ymd_hms("2023-01-04 02:12:30"), to = ymd_hms("2023-02-01 01:10:10"), by = 'hour'), n, replace = TRUE),
+    `Duration (in seconds)` = round(rnorm(n = n, mean = 270, sd = 67), 0),
+    EndDate = StartDate + seconds(`Duration (in seconds)`),
+    Status = sample(c("Survey Preview", "IP Address"), n, replace = TRUE),
+    Progress = round(rnorm_ceiling(n = n, mean = 100, sd = 3, ceiling = 100), 0),
+    Finished = if_else(Progress == 100, "True", "False"),
+    RecordedDate = EndDate,
+    ResponseId = map_chr(seq_len(n), ~ paste0("R_", stringi::stri_rand_strings(1, 15))),
+    DistributionChannel = sample(c("anonymous", "preview"), n, replace = TRUE),
+    UserLanguage = rep("EN", n),
+    consent = sample(c("Yes", "No"), n, replace = TRUE, prob = c(0.95, 0.05)),
+    reason_mistake = sample(c("not at all", "partially", "it was the main reason"), n, replace = TRUE, prob = c(0.1, 0.3, 0.6)),
+    # For the simulation we assume that all mistake types will occur with the same probability
+    mistake_type = sample(mistake_types, n, replace = TRUE),
+    mistake_type_random_text = map_chr(seq_len(n), ~ rand_lorem_ipsum(sample(1:4, 1))),
+    mistake_type_21_TEXT = case_when(
+      mistake_type == "Other, please specify:" ~ mistake_type_random_text,
+      TRUE ~ NA_character_
+    ),
+    mistake_cause = sample(mistake_causes, n, replace = TRUE),
+    mistake_cause_random_text = map_chr(seq_len(n), ~ rand_lorem_ipsum(sample(1:4, 1))),
+    mistake_cause_16_TEXT = case_when(
+      mistake_cause == "Other, please specify:" ~ mistake_cause_random_text,
+      TRUE ~ NA_character_
+    ),
+    workflow = sample(c("Yes", "No"), n, replace = TRUE),
+    experience = rand_lorem_ipsum(sample(4:15, 1)),
+    stress = sample(stress, n, replace = TRUE),
+    comment_random_text = map_chr(seq_len(n), ~ paste0(stringi::stri_rand_strings(1, 5), "@", stringi::stri_rand_strings(1, 5)), ".com"),
+    comment = sample(c(1L, 0L), n, replace = TRUE, prob = c(0.2, 0.8))
+  ) %>% 
+  mutate(
+    comment = case_when(
+      comment == 1L ~ comment_random_text,
+      comment == 0L ~ NA_character_
+    )
+  ) %>% 
+  mutate(across(everything(), as.character)) %>% 
+  select(-contains("_random_text"))
+
+# Deleting responses for those who responded "not at all" to the reason_mistake question
+source_sim <-
+  source_sim %>% 
+  mutate(
+    across(
+      c("mistake_type", "mistake_type_21_TEXT", "mistake_cause", "mistake_cause_16_TEXT", "workflow", "experience", "stress", "comment"),
+      ~ ifelse(reason_mistake == "not at all", NA, .)
+    ))
+
+# Inserting NAs randomly
+source_sim <- insert_na(source_sim, max = 6)
+
+# Adding the Qualtrics descriptive rows to the simulated data
+source_sim <- 
+  source %>% 
+  slice(1:2) %>% 
+  bind_rows(., source_sim)
+```
+
+# Saving the simulated data
+
+```{r}
+write_csv(source_sim, here("data/source/retractionwatch_source_simulated_data.csv"))
+```
+

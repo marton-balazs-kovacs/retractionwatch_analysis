@@ -1,0 +1,100 @@
+---
+title: "Retractiowatch project: Preprocessing of source data"
+author: "Marton Kovacs"
+date: "`r Sys.Date()`"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(here)
+```
+
+# Load data
+
+For the analysis the name of the source datafile will be changed. For the preregistration we use the simulated datafile.
+
+```{r}
+source <- read_csv(here("data/source/retractionwatch_source_simulated_data.csv"))
+```
+
+# Clean variable names
+
+We follow the snake-case standard naming convention.
+
+```{r}
+source <- janitor::clean_names(source)
+```
+
+# Reviewing free-text variables
+
+It is possible that to questions with free-text response options the respondents included information in their response that would make their identity compromised. We review these variables and delete the part of their response that would allow others to identify their response. These responses will be flagged.
+
+The variables that have free-text response options are the following:
+* mistake_type_21_text
+* mistake_cause_16_text
+* experience
+* comment
+
+We only run this code chunk if we find personal information upon manual checking in the free-text responses. For the preregistration example values will be replaced randomly in the simulated dataset.
+
+```{r}
+source <- 
+  source %>% 
+  # Modifying responses with identifiable information
+  # Only those variables will be included in the final analysis where there are personal information
+  mutate(
+    mistake_type_21_text = case_when(
+      response_id == "R_lWJzX12QavR1qOh" ~ "mistake response with omitted personal information",
+      TRUE ~ mistake_type_21_text
+    ),
+    mistake_cause_16_text = case_when(
+      response_id == "R_yFn8FrcHewSFWk9o" ~ "cause response with omitted personal information",
+      TRUE ~ mistake_cause_16_text
+    ),
+    experience = case_when(
+      response_id == "R_OVTkzUwXwuWnCvi" ~ "experience response with omitted personal information",
+      TRUE ~ experience
+    )
+  ) %>% 
+  # Flagging responses where the response was modified
+  mutate(
+    mistake_type_21_text_modified = case_when(
+      response_id %in% c("R_lWJzX12QavR1qOh") ~ 1L,
+      TRUE ~ 0L
+    ),
+    mistake_cause_16_text_modified = case_when(
+      response_id %in% c("R_yFn8FrcHewSFWk9") ~ 1L,
+      TRUE ~ 0L
+    ),
+    experience_modified = case_when(
+      response_id %in% c("R_OVTkzUwXwuWnCvi") ~ 1L,
+      TRUE ~ 0L
+    )
+  )
+```
+
+Since in the __comment__ variable we only ask respondents to provide their email addresses if they are interested in being part of a follow-up qualitative interview, this variable will not be included in the raw data file.
+
+```{r}
+source <-
+  source %>% 
+  select(
+    # Dropping the comment variable
+    - comment,
+    # Dropping email addresses
+    - email
+    )
+```
+
+# Saving the raw data
+
+The file name of the actual datafile will be changed to _retractionwatch_raw_data.tsv_. We do not make any other modifications to the datafile.
+
+```{r}
+write_csv(source, here("data/raw/retractionwatch_raw_simulated_data.csv"))
+```
+

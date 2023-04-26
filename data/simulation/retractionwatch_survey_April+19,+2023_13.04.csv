@@ -1,0 +1,43 @@
+StartDate,EndDate,Status,Progress,Duration (in seconds),Finished,RecordedDate,ResponseId,DistributionChannel,UserLanguage,consent,reason_mistake,mistake_type,mistake_type_21_TEXT,mistake_cause,mistake_cause_16_TEXT,stress,workflow,experience,comment
+Start Date,End Date,Response Type,Progress,Duration (in seconds),Finished,Recorded Date,Response ID,Distribution Channel,User Language,"We found your paper in the Retraction Watch database (http://retractiondatabase.org/) and we would like to ask 5 short questions about the mistakes that you identify behind this unfortunate event.  
+
+
+
+In this study, we examine the types and causes of data management mistakes made in retracted social science papers. Our survey aims to help researchers by highlighting those honest mistakes that can potentially lead to retractions.
+
+
+
+We value your time so we tried to make this survey as short as possible. Completing the survey takes an average of 3 minutes.
+
+
+
+We link your answers to the retracted paper only for analytical purposes. Neither the title of the paper nor any information on the authors of the retracted paper will be shared publicly. Only your survey responses and the reasons behind the retraction will be made publicly available in a way that they cannot be linked to you.
+
+
+
+I hereby declare that I have understood and accept the information given above and in the detailed informed consent form (https://osf.io/3sc46), and I give my consent to participate in this survey as well as to the processing of all the data I provide and to share my anonymous responses.
+
+ 
+Marton Kovacs, ELTE University, Hungary
+
+Russell Poldrack, Stanford University, USA
+
+ 
+
+Contact:
+
+kovacs.marton@ppk.elte.hu
+
+The OSF page of the project: https://osf.io/v7fc2/","To what degree was the retraction of your work, mentioned in our email, caused by data management mistakes?","Which of the following data management mistake type contributed the most to the retraction of your paper?
+
+ 
+
+If you need an explanation for some of these labels, examples of the response options can be found next to each option in parentheses. - Selected Choice","Which of the following data management mistake type contributed the most to the retraction of your paper?
+
+ 
+
+If you need an explanation for some of these labels, examples of the response options can be found next to each option in parentheses. - Other, please specify: - Text","What was the main cause of the data management mistake you identified above?
+If you need an explanation for some of these labels, examples of the response options can be found next to each option in parentheses. - Selected Choice","What was the main cause of the data management mistake you identified above?
+If you need an explanation for some of these labels, examples of the response options can be found next to each option in parentheses. - Other, please specify: - Text",How much stress did you experience due to the retraction of the article?,Did you change anything in your research workflow because of the retraction?,Is there anything else that you would like to share about your experience with the retraction?,"Here, you can leave any comments on the project or lessons learned that you would like to share. Please add your email address here if you would be open to a more in-depth chat about your experience."
+"{""ImportId"":""startDate"",""timeZone"":""Europe/Berlin""}","{""ImportId"":""endDate"",""timeZone"":""Europe/Berlin""}","{""ImportId"":""status""}","{""ImportId"":""progress""}","{""ImportId"":""duration""}","{""ImportId"":""finished""}","{""ImportId"":""recordedDate"",""timeZone"":""Europe/Berlin""}","{""ImportId"":""_recordId""}","{""ImportId"":""distributionChannel""}","{""ImportId"":""userLanguage""}","{""ImportId"":""QID2""}","{""ImportId"":""QID4""}","{""ImportId"":""QID5""}","{""ImportId"":""QID5_21_TEXT""}","{""ImportId"":""QID6""}","{""ImportId"":""QID6_16_TEXT""}","{""ImportId"":""QID7""}","{""ImportId"":""QID8""}","{""ImportId"":""QID10_TEXT""}","{""ImportId"":""QID14_TEXT""}"
+2023-04-19 12:52:21,2023-04-19 12:53:05,IP Address,100,44,True,2023-04-19 12:53:06,R_2pRiYiisPokhlDP,anonymous,EN,Yes,partially,"Ambiguous naming/defining of data (e.g. ambiguous naming, inconsistent identifier, incorrect labeling,  non- transparent naming, poor labeling of variables)",,"Bad or lack of standards (e.g. bad routines, error in coding protocol, error in data organization, inconsistent file naming, insufficient procedures)",,1,Yes,test,test
