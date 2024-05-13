@@ -15,10 +15,8 @@ library(here)
 
 # Load data
 
-For the analysis the name of the source datafile will be changed. For the preregistration we use the simulated datafile.
-
 ```{r}
-source <- read_csv(here("data/source/retractionwatch_source_simulated_data.csv"))
+source <- read_csv(here("data/source/ignore/qualtrics/retractionwatch_survey_July+25,+2023_11.40.csv"))
 ```
 
 # Clean variable names
@@ -27,6 +25,28 @@ We follow the snake-case standard naming convention.
 
 ```{r}
 source <- janitor::clean_names(source)
+```
+
+# Saving non-data management mistakes
+
+To explore the retraction notices of those respondents who claim their paper was not retracted due to data management mistakes we save their responses with the title of their paper in a separate file. In order to ensure anonymity we cannot share openly the title of their paper.
+
+```{r}
+rw_database <- readxl::read_xlsx(here::here("data/source/ignore/RWDBDNLD11102022.xlsx")) %>% janitor::clean_names()
+
+source %>% 
+  dplyr::filter(
+    # Title can be empty for test responses only
+    !is.na(title),
+    reason_mistake == "not at all"
+    ) %>% 
+  select(response_id, reason_mistake, title) %>% 
+  # We are joining the rest of the retraction watch database to our respondents to find links easily to
+  # the retraction notices
+  # Note: In some cases the join will not work since the rw_database titles were not unicode and we renamed them
+  left_join(., rw_database, by = "title") %>%
+  mutate(is_cause_rdm = NA_character_) %>% 
+  writexl::write_xlsx(., here("data/source/ignore/retractionwatch_non-mistake_data.xlsx"))
 ```
 
 # Reviewing free-text variables
@@ -39,62 +59,53 @@ The variables that have free-text response options are the following:
 * experience
 * comment
 
-We only run this code chunk if we find personal information upon manual checking in the free-text responses. For the preregistration example values will be replaced randomly in the simulated dataset.
+Upon manual examination we did not find any identifying information in any of the questions with free-text response options.
+
+We originally wanted to delete the __comment__ variable from the raw data since we planned to ask only about the respondents willingness to do a followup qualitative interview regarding their experiences with the retraction. Since some of the respondents provided useful information in this variable we decided to delete the identifying information from the variable but to keep the rest of their responses. Rows where identifying information was deleted are flagged.
+
+There were some identifying information in the __experience__ variable as well. This variable will be modified as well similarly to the __comment__ variable.
+
+Deleting the identifying information was deleted manually from the raw dataset after it has been saved.
 
 ```{r}
-source <- 
+source <-
   source %>% 
-  # Modifying responses with identifiable information
-  # Only those variables will be included in the final analysis where there are personal information
   mutate(
-    mistake_type_21_text = case_when(
-      response_id == "R_lWJzX12QavR1qOh" ~ "mistake response with omitted personal information",
-      TRUE ~ mistake_type_21_text
-    ),
-    mistake_cause_16_text = case_when(
-      response_id == "R_yFn8FrcHewSFWk9o" ~ "cause response with omitted personal information",
-      TRUE ~ mistake_cause_16_text
-    ),
-    experience = case_when(
-      response_id == "R_OVTkzUwXwuWnCvi" ~ "experience response with omitted personal information",
-      TRUE ~ experience
-    )
-  ) %>% 
-  # Flagging responses where the response was modified
-  mutate(
-    mistake_type_21_text_modified = case_when(
-      response_id %in% c("R_lWJzX12QavR1qOh") ~ 1L,
-      TRUE ~ 0L
-    ),
-    mistake_cause_16_text_modified = case_when(
-      response_id %in% c("R_yFn8FrcHewSFWk9") ~ 1L,
-      TRUE ~ 0L
+    comment_modified = case_when(
+      response_id == "R_2eRNkGLXhavS7Jm" ~ "modified",
+      response_id == "R_2z7ujRi4un2YN96" ~ "modified",
+      response_id == "R_2CHB420Ko7fYH24" ~ "modified",
+      response_id == "R_3PHWZMgHssVJ0ea" ~ "modified",
+      response_id == "R_1Quf6sG5SUnjG8T" ~ "modified",
+      response_id == "R_3oHqfVjUBTssSki" ~ "modified",
+      response_id == "R_1K7SMT7IR2f7NaX" ~ "modified",
+      response_id == "R_Y02jyStUzz2j1LP" ~ "modified",
+      TRUE ~ "not modified"
     ),
     experience_modified = case_when(
-      response_id %in% c("R_OVTkzUwXwuWnCvi") ~ 1L,
-      TRUE ~ 0L
-    )
+      response_id == "R_Y02jyStUzz2j1LP" ~ "modified",
+      TRUE ~ "not modified"
+    ),
   )
 ```
 
-Since in the __comment__ variable we only ask respondents to provide their email addresses if they are interested in being part of a follow-up qualitative interview, this variable will not be included in the raw data file.
+However, we do delete the title of their study from the dataset which was collected as embeded data in Qualtrics.
 
 ```{r}
 source <-
   source %>% 
   select(
-    # Dropping the comment variable
-    - comment,
-    # Dropping email addresses
-    - email
+    -title
     )
 ```
 
 # Saving the raw data
 
+_Warning:_ The __experience__ and __comment__ variable responses that included identifiable information are removed by hand after the raw datafile has been saved. Saving the raw datafile again might override the manually modified values!
+
 The file name of the actual datafile will be changed to _retractionwatch_raw_data.tsv_. We do not make any other modifications to the datafile.
 
 ```{r}
-write_csv(source, here("data/raw/retractionwatch_raw_simulated_data.csv"))
+write_csv(source, here("data/raw/retractionwatch_raw_data.csv"))
 ```
 

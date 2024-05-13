@@ -20,10 +20,8 @@ purrr::walk(r_scripts, source)
 
 # Load data
 
-For the analysis the name of the raw datafile will be changed. For the preregistration we use the simulated datafile.
-
 ```{r}
-raw <- read_csv(here("data/raw/retractionwatch_raw_simulated_data.csv"))
+raw <- read_csv(here("data/raw/retractionwatch_raw_data.csv"))
 ```
 
 Before any exclusions we had `r nrow(raw)` responses in the dataset.
@@ -39,13 +37,12 @@ raw <-
 # Exclusions
 ## Test data
 
-The survey was sent out on _sent_out_date_ to the participants. Thus, any responses in the dataset before that date are coming from the testing of the survey. These responses will be excluded from further analysis. We excluded `r raw %>% dplyr::filter(lubridate::as_date(start_date) < lubridate::as_date("2023-01-28")) %>% nrow()` test responses. 
+The survey was sent out on _sent_out_date_ to the participants. Thus, any responses in the dataset before that date are coming from the testing of the survey. These responses will be excluded from further analysis. We excluded `r raw %>% dplyr::filter(lubridate::as_date(start_date) < lubridate::as_date("2023-05-09")) %>% nrow()` test responses. 
 
 ```{r}
-# The current start date is just a random value for the sake of the preregistration. It will be replaced for the analysis with the actual sent out date.
 raw <-
   raw %>% 
-  dplyr::filter(lubridate::as_date(start_date) >= lubridate::as_date("2023-01-03"))
+  dplyr::filter(lubridate::as_date(start_date) >= lubridate::as_date("2023-05-09"))
 ```
 
 ## Responses without consent
@@ -53,6 +50,13 @@ raw <-
 There were `r filter(raw, consent != "Yes") %>% nrow()` that did no provide consent for participation.
 
 ```{r}
+# Number of participants
+nrow(raw)
+
+# Number of responses to consent
+raw %>% 
+  count(consent)
+
 raw <-
   raw %>% 
   filter(consent == "Yes")
@@ -62,30 +66,114 @@ raw <-
 
 We only include full responses in the final analysis as preregistered. A response is considered complete if all the required questions are answered (variables _reason_mistake_, _mistake_type_, _mistake_cause_, and _stress_).
 
+We had to modify the preregistered code because it excluded cases where the participant responded "not at all" to reason_mistake. Although, later in the analysis we need these values even though the rest of the responses will be empty due to survey termination.
+
+TODO: Change has missing in a way to count for cases where the respondent choose the other option but did not provide a response: R_2eRNkGLXhavS7Jm or delete this case because it is not a data management error
+
 ```{r}
-raw <- 
-  raw %>% 
+raw <-
+  raw %>%
   mutate(
     has_missing = case_when(
+      reason_mistake == "not at all" ~ FALSE,
       if_any(
         c(
           reason_mistake,
           mistake_type,
           mistake_cause,
           stress
-          ),
-        .fns = is.na) ~ TRUE,
+        ),
+        .fns = is.na
+      ) ~ TRUE,
       TRUE ~ FALSE
-      )
     )
+  )
 ```
 
 There were `r dplyr::filter(raw, has_missing) %>% nrow()` respondents who did not finish the survey.
 
 ```{r}
+# Number of partial responses
+raw %>% 
+  filter(has_missing) %>%
+  nrow()
+
 raw <-
   raw %>% 
   filter(!has_missing)
+```
+
+Respondents who responded that the retraction of their paper was not at all because of a data management mistake were excluded from further analysis.
+
+For the first question we forgot to add forced response thus there is a respondent who responded to all the other question except that one. The respondents unique id is: R_2xxXQpmAfODuZZm. Since we cannot be sure that a data management mistake is the main reason behind this respondent's retraction we drop their responses.
+
+Upon examining the free-text responses we realized that one respondent indicated in their free text response to the question regarding the mistake type that the retracted paper we contacted them with is not their paper. Thus, we exclude all responses from respondent "R_2YScN2gvzdN4NiI" from any further analysis.
+
+```{r}
+raw <-
+  raw %>% 
+  filter(response_id != "R_2YScN2gvzdN4NiI")
+```
+
+Creating a plot of the distribution of the responses for the paper.
+
+```{r mistakeReasonPlot, fig.path='../manuscript/figs/', dev=c('png', 'pdf'), fig.width=9, fig.height=6}
+# With percentage
+mistake_reason_plot_data <- 
+  raw %>%
+  select(reason_mistake) %>% 
+  mutate(
+    reason_mistake = gsub("^(\\w)", "\\U\\1", reason_mistake, perl = TRUE),
+    reason_mistake = factor(reason_mistake, levels = c(
+        "It was the main reason",
+        "Partially",
+        "Not at all"
+      ))) %>% 
+  count(reason_mistake) %>% 
+  ungroup() %>% 
+  mutate(N = sum(n),
+         percentage = round(n / N * 100, 0))
+
+y_max <- max(mistake_reason_plot_data$n) + 10
+  
+mistake_reason_plot <- 
+  mistake_reason_plot_data %>% 
+  ggplot() +
+  aes(x = reason_mistake, y = n) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label = paste0(percentage, "%")), size = 8, vjust = -0.3) +
+  labs(x = paste0("To what degree was the retraction of your work,\nmentioned in our email, caused by data management mistakes? (n =", unique(mistake_reason_plot_data$N), ")"),
+       y = "Number of responses") +
+  scale_y_continuous(expand = c(0,0), limit = c(0, y_max)) +
+  theme(axis.ticks = element_line(color = "black"),
+        axis.line = element_line(color = "black"),
+        axis.text = element_text(color = "black", size = 13),
+        panel.background = element_blank(),
+        axis.title = element_text(size = 15),
+        plot.margin = unit(c(0,0.8,0,0), "cm"))
+
+ggsave(here::here("figures/mistake_reason_plot.jpg"), mistake_reason_plot, dpi = 300, height = 5, width = 10)
+
+mistake_reason_plot
+```
+
+Counting the different response options.
+
+```{r}
+raw %>% 
+  count(reason_mistake)
+```
+
+It seems like more than half of our sample did not think that they committed a data management error despite our pre-selection of data management error labels based on the classification of the Retraction Watch database.
+
+We will explore the retraction notices of these responses to see whether the description of the reasons behind the retraction that was used for the classification do refer to data management errors. To do this, we have to identify the responses through the title of the paper. However, the title of the paper cannot be shared openly due to the constrains outline in the informed consent form and the IRB protocol.
+
+Excluding participants who responded "not at all".
+
+```{r}
+raw <-
+  raw %>% 
+  filter(reason_mistake != "not at all")
 ```
 
 At the end of the exclusion we had `r nrow(raw)` responses remaining for the analysis.
@@ -97,12 +185,9 @@ raw <-
   raw %>% 
   select(
     # variables created by Qualtrics that we do not need anymore
-    - start_date,
-    - end_date,
     - status,
     - progress,
     - finished,
-    - recorded_date,
     - distribution_channel,
     - user_language,
     # Missing responses flag variables
@@ -110,137 +195,214 @@ raw <-
   )
 ```
 
-# Grouping free-text responses
+# Grouping free-text responses to error types and causes
 
-We will use thematic analysis to group the free-text responses separately for variables `mistake_type_21_text`, `mistake_cause_16_text`, `experience`.
+We used thematic analysis to group the free-text responses separately for variables `mistake_type_21_text`, `mistake_cause_16_text`. During this process we were interested in finding any freely reported error or cause that do not fit into our previous taxonomy.
 
-One author will first go through the free-text responses and summarize their content into short text codes.
+Marton Kovacs first went through the free-text responses and separated each error or cause into a different cell if the author reported multiple response. We only kept the first error or cause reported. Then, Marton Kovacs summarized the content of the responses into short text codes.
 
 ```{r}
-to_code <-
+to_code_mistake <-
   raw %>% 
-  select(response_id, mistake_type_21_text, mistake_cause_16_text, experience) %>% 
+  select(response_id, mistake_type_21_text, mistake_cause_16_text) %>% 
   pivot_longer(-response_id, names_to = "variable", values_to = "value") %>% 
   filter(!is.na(value)) %>%
   arrange(variable) %>% 
-  mutate(code = NA_character_)
+  mutate(
+    separated_id = NA_character_,
+    separated_value = NA_character_,
+    code = NA_character_
+    )
+
+# Number of free-text responses to code for the mistake types and causes
+to_code_mistake |> 
+  count(variable)
 
 # Danger: By running this code you can override manually coded values
-# write_xlsx(to_code, here("data/raw/grouping/retractionwatch_coding.xlsx"))
+# writexl::write_xlsx(to_code_mistake, here("data/raw/grouping/retractionwatch_mistake_coding.xlsx"))
 ```
 
-Reading the codes and dropping irrelevant responses.
+Reading the codes and dropping responses not specific to the question.
 
 ```{r}
-codes <- readxl::read_xlsx(here("data/raw/grouping/retractionwatch_coding.xlsx"))
+codes_mistake <- readxl::read_xlsx(here("data/raw/grouping/retractionwatch_mistake_coding.xlsx"))
 
-to_group <-
-  codes %>% 
-  filter(code != "irrelevant") %>% 
-  select(- value) %>% 
+# See if there are any responses that are not coded
+codes_mistake %>% filter(is.na(code)) %>% nrow()
+
+# Number of responses for mistakes types and causes after separation
+codes_mistake |> 
+  count(variable)
+
+# Number of responses after the exclusion during coding for mistake types and causes
+codes_mistake |> 
+  filter(code %ni% c("not specific to the question", "insufficient information", "second response")) |> 
+  count(variable)
+
+to_group_mistake <-
+  codes_mistake %>% 
+  # We only count the first answer in each response in case there are multiple pieces of information mentioned
+  filter(code %ni% c("not specific to the question", "insufficient information", "second response")) %>% 
+  select(-value, -separated_id) %>% 
   mutate(group = NA_character_)
 
 # Danger: By running this code you can override manually coded values
-# write_xlsx(to_group, here("data/raw/grouping/retractionwatch_grouping.xlsx"))
+# write_xlsx(to_group_mistake, here("data/raw/grouping/retractionwatch_mistake_grouping.xlsx"))
+```
+
+The number of responses excluded during coding for the questions regarding the error types and causes.
+
+```{r}
+codes_mistake %>% 
+  # We only count the first answer in each response in case there are multiple pieces of information mentioned
+  filter(separated_id == 1L) %>%
+  filter(code %in% c("irrelevant response", "insufficient information")) %>% 
+  count(variable, code)
 ```
 
 Creating definitions for the groups based on the codes that were assigned to them.
 
 ```{r}
-groups <- readxl::read_xlsx(here("data/raw/grouping/retractionwatch_grouping.xlsx"))
+groups_mistake <- readxl::read_xlsx(here("data/raw/grouping/retractionwatch_mistake_grouping.xlsx"))
 
-definitions <-
-  groups %>% 
+definitions_mistake <-
+  groups_mistake %>% 
+  filter(group != "insufficient information") |> 
   group_by(variable, group) %>% 
   distinct(code, .keep_all = TRUE) %>% 
   dplyr::summarise(definition = stringr::str_c(code, collapse = "; ")) %>% 
   mutate(definition = tolower(definition))
 
-# write_xlsx(definitions, here("data/raw/grouping/retractionwatch_definitions.xlsx"))
-```
-
-Preparing data for the sorting free-text responses into groups.
-
-```{r}
-to_sort <-
-  raw %>% 
-  select(response_id, mistake_type_21_text, mistake_cause_16_text, experience) %>% 
-  pivot_longer(-response_id, names_to = "variable", values_to = "value") %>% 
-  filter(!is.na(value)) %>%
-  arrange(variable) %>% 
-  mutate(
-    rater_1 = NA_character_,
-    rater_2 = NA_character_)
-
-# Danger: By running this code you can override manually coded values
-# write_xlsx(to_sort, here("data/raw/grouping/retractionwatch_sorting.xlsx"))
-```
-
-Comparing ratings.
-
-```{r}
-sorting <- readxl::read_xlsx(here("data/raw/grouping/retractionwatch_sorting.xlsx"))
-
-to_match <-
-  sorting %>% 
-  mutate(
-    match = case_when(
-      rater_1 == rater_2 ~ TRUE,
-      TRUE ~ FALSE
-    ),
-    final_group = case_when(
-      match == TRUE ~ rater_1,
-      TRUE ~ NA_character_
-    )
-  )
-
-# Danger: By running this code you can override manually coded values
-# write_xlsx(to_match, here("data/raw/grouping/retractionwatch_comparison.xlsx"))
+# write_xlsx(definitions_mistake, here("data/raw/grouping/retractionwatch_mistake_definitions.xlsx"))
 ```
 
 Merging the final groups with the raw data.
 
 ```{r}
-comparison <- readxl::read_xlsx(here("data/raw/grouping/retractionwatch_comparison.xlsx"))
-
-comparison <-
-  comparison %>% 
+wide_groups_mistake <-
+  groups_mistake %>% 
   select(
     response_id,
     variable,
-    final_group
+    group
   ) %>% 
   pivot_wider(
     id_cols = response_id,
     names_from = variable,
-    values_from = final_group,
+    values_from = group,
     names_prefix = "group_"
   )
 
 raw <-
   raw %>% 
-  left_join(., comparison, by = "response_id") %>% 
+  left_join(., wide_groups_mistake, by = "response_id") %>% 
   mutate(
     mistake_type = case_when(
+      # Responses that could not be grouped are coded as missing in the processed dataset
+      group_mistake_type_21_text == "insufficient information" ~ NA_character_,
       mistake_type == "Other, please specify:" ~ group_mistake_type_21_text,
       TRUE ~ mistake_type
     ),
     mistake_cause = case_when(
+      # Responses that could not be grouped are coded as missing in the processed dataset
+      group_mistake_cause_16_text == "insufficient information" ~ NA_character_,
       mistake_cause == "Other, please specify:" ~ group_mistake_cause_16_text,
       TRUE ~ mistake_cause
     )
   ) %>% 
   select(
-    - experience,
     - group_mistake_type_21_text,
     - group_mistake_cause_16_text,
     - mistake_type_21_text,
     - mistake_cause_16_text,
-    - mistake_type_21_text_modified,
-    - mistake_cause_16_text_modified,
-    - experience_modified
-    ) %>% 
-  rename(experience = group_experience)
+    )
+```
+
+# Thematic analysis of responses to the question about experiences and further comments
+
+Based on an initial exploration of the responses most of the respondents discussed multiple separate topics in their comments to the question asking about their experience (variable `experience`) with the retraction of their paper. Thus, we decided to group these responses separately for two different research questions that we formulated based on the responses and previous literature on the topic.
+
+These questions are the following:
+* 1) What practical changes did the authors introduce to their research workflow as a result of the error and/or the retraction?
+* 2) What practical changes do the authors recommend to the journals regarding the retraction process? 
+
+Also, we decided to code and group the responses in the `comment` variable as they provide valuable information in some cases regarding the error, the retraction, and/or the retraction experience. The responses in these two variables were grouped together.
+
+First, we identified which responses relate to each of the two questions. 0 means the given response is not related to the question and 1 means the response contains information referring to a question.
+
+```{r}
+to_separate_experience <-
+  raw %>% 
+  select(response_id, experience, comment) %>% 
+  pivot_longer(-response_id, names_to = "variable", values_to = "value") %>% 
+  filter(!is.na(value)) %>%
+  arrange(variable) %>% 
+  mutate(
+    changes = NA_integer_,
+    `suggestion to journal` = NA_integer_,
+    unclear = NA_integer_,
+    )
+
+# writexl::write_xlsx(to_separate_experience, here("data/raw/grouping/retractionwatch_experience_separating.xlsx"))
+```
+
+Then, we created separate datafiles for each question. Each datafile contains the original response (`value`), the specific extracted part of the responses that is relevant for the given question (`extract`), the initial code that contains the relevant feature of the extract (`code`), and the higher-level `theme` created by collating the `codes`.
+
+```{r}
+separated_experience <- readxl::read_xlsx(here::here("data/raw/grouping/retractionwatch_experience_separating.xlsx"))
+
+# Cleaning the separated responses
+separated_experience <-
+  separated_experience |> 
+  filter(unclear != 1) |> 
+  filter(!(changes == 0 & `suggestion to journal` == 0))
+
+to_code_experience_change <-
+  separated_experience |> 
+  filter(changes == 1) |> 
+  mutate(
+    extract_id = NA_integer_,
+    extract = NA_character_,
+    code = NA_character_,
+    theme = NA_character_
+  ) |> 
+  dplyr::select(-c(changes, `suggestion to journal`, unclear))
+
+to_code_experience_suggestion <-
+  separated_experience |> 
+  filter(`suggestion to journal` == 1) |> 
+  mutate(
+    extract_id = NA_integer_,
+    extract = NA_character_,
+    code = NA_character_,
+    theme = NA_character_
+  ) |> 
+  dplyr::select(-c(changes, `suggestion to journal`, unclear))
+
+# writexl::write_xlsx(to_code_experience_change, here::here("data/raw/grouping/to_code_experience_change.xlsx"))
+# writexl::write_xlsx(to_code_experience_suggestion, here::here("data/raw/grouping/to_code_experience_suggestion.xlsx"))
+```
+
+Then, we list the codes and extracts for each theme and for each question separately. These files were used to review the themes and to later inform their interpretation.
+
+```{r}
+coded_experience_change <- readxl::read_xlsx(here::here("data/raw/grouping/to_code_experience_change.xlsx"))
+coded_experience_suggestions <- readxl::read_xlsx(here::here("data/raw/grouping/to_code_experience_suggestion.xlsx"))
+
+definitions_experience_change <-
+  coded_experience_change |> 
+  dplyr::group_by(theme) |> 
+  dplyr::summarise(definition = glue::glue_collapse(code, sep = ", ")) |> 
+  dplyr::arrange(theme)
+
+definitions_experience_suggestions <-
+  coded_experience_suggestions |> 
+  dplyr::group_by(theme) |> 
+  dplyr::summarise(definition = glue::glue_collapse(code, sep = ", ")) |> 
+  dplyr::arrange(theme)
+
+writexl::write_xlsx(definitions_experience_change, here::here("data/raw/grouping/definitions_experience_change.xlsx"))
+writexl::write_xlsx(definitions_experience_suggestions, here::here("data/raw/grouping/definitions_experience_suggestions.xlsx"))
 ```
 
 # Mutating variables
@@ -257,14 +419,11 @@ raw <-
     mistake_cause =  str_to_sentence(mistake_cause),
     stress = as.integer(str_extract(stress, "\\d+")),
     reason_mistake = str_to_sentence(reason_mistake),
-    experience = str_to_sentence(experience)
   )
 ```
 
 # Saving the processed data
 
-The file name of the actual datafile will be changed to _retractionwatch_processed_data.tsv_. We do not make any other modifications to the datafile.
-
 ```{r}
-write_csv(raw, here("data/processed/retractionwatch_processed_simulated_data.csv"))
+write_csv(raw, here("data/processed/retractionwatch_processed_data.csv"))
 ```

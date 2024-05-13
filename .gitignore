@@ -3,4 +3,4 @@
 .RData
 .Ruserdata
 data/source/ignore/
-./analysis/retractionwatch_sample-selection.Rmd
+analysis/retractionwatch_sample-selection.Rmd

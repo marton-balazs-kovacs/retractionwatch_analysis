@@ -11,14 +11,13 @@ editor_options:
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(here)
+library(ggalluvial)
 ```
 
 # Load data
 
-_Note:_ The name of the datafile will be changed only for the final analysis.
-
 ```{r}
-processed <- read_csv(here("data/processed/retractionwatch_processed_simulated_data.csv"))
+processed <- read_csv(here("data/processed/retractionwatch_processed_data.csv"))
 ```
 
 # Distribution of completition time
@@ -37,63 +36,27 @@ processed %>%
   geom_histogram() +
   labs(
     x = "Response duration in minutes",
-    y = "Count"
+    y = "Number of responses"
   )
 ```
 
-# To what degree was the retraction of your work, mentioned in our email, caused by data management mistakes?
+# Which of the following data management error type contributed the most to the retraction of your paper?
 
-```{r}
-# With percentage
-mistake_reason_plot_data <- 
-  processed %>%
-  select(reason_mistake) %>% 
-  mutate(reason_mistake = factor(reason_mistake, levels = c(
-        "It was the main reason",
-        "Partially",
-        "Not at all"
-      ))) %>% 
-  count(reason_mistake) %>% 
-  ungroup() %>% 
-  mutate(N = sum(n),
-         percentage = round(n / N * 100, 0))
+We calculate the percentage of occurrence for all RDM error types. We also create a figure on the distribution of these percentages for those error types that occurred in more than 1% of the cases.
 
-y_max <- max(mistake_reason_plot_data$n) + 10
-  
-mistake_reason_plot <- 
-  mistake_reason_plot_data %>% 
-  ggplot() +
-  aes(x = reason_mistake, y = n) +
-  geom_bar(stat = "identity") +
-  geom_text(aes(label = paste0(percentage, "%")), size = 8, vjust = -0.3) +
-  labs(x = paste0("To what degree was the retraction of your work,\nmentioned in our email, caused by data management mistakes? (n =", unique(mistake_reason_plot_data$N), ")"),
-       y = "Count") +
-  scale_y_continuous(expand = c(0,0), limit = c(0, y_max)) +
-  theme(axis.ticks = element_line(color = "black"),
-        axis.line = element_line(color = "black"),
-        axis.text = element_text(color = "black", size = 18),
-        panel.background = element_blank(),
-        axis.title = element_text(size = 18),
-        plot.margin = unit(c(0,0.8,0,0), "cm"))
-
-mistake_reason_plot
-```
-
-# Which of the following data management mistake type contributed the most to the retraction of your paper?
-
-We calculate the percentage of occurrence for all RDM mistake types. We also create a figure on the distribution of these percentages for those mistake types that occurred in more than 1% of the cases.
-
-```{r}
+```{r typePlot, fig.path='../manuscript/figs/', dev=c('png', 'pdf'), fig.width=9, fig.height=6}
 mistake_type_plot_data <-
   processed %>% 
-  # Excluding irrelevant responses
-  filter(mistake_type != "Irrelevant") %>% 
+  # Excluding missing and dropped responses
+  filter(!is.na(mistake_type)) %>% 
   select(mistake_type) %>% 
   count(mistake_type) %>% 
   ungroup() %>% 
   mutate(N = sum(n),
          percentage = round(n / N * 100, 0)) %>% 
   arrange(desc(n))
+
+glue::glue_collapse(mistake_type_plot_data$mistake_type, sep = "\n")
 
 y_max <- max(mistake_type_plot_data$n) + 10
   
@@ -105,62 +68,39 @@ mistake_type_plot <-
   geom_bar(stat = "identity") +
   geom_text(aes(label = paste0(percentage, "%")), size = 8, hjust = -0.3) +
   labs(x = paste0("Which of the following data management mistake type\ncontributed the most to the retraction of your paper? (n =", unique(mistake_type_plot_data$N), ")"),
-       y = "Count") +
+       y = "Number of responses") +
   coord_flip() +
   scale_y_continuous(expand = c(0,0), limit = c(0, y_max)) +
   theme(
     axis.ticks = element_line(color = "black"),
     axis.line = element_line(color = "black"),
-    axis.text = element_text(color = "black", size = 18),
+    axis.text = element_text(color = "black", size = 13),
     panel.background = element_blank(),
-    axis.title = element_text(size = 18),
+    axis.title = element_text(size = 15),
     plot.margin = unit(c(0,0.8,0,0), "cm")
     )
+
+ggsave(here::here("figures/mistake_type_plot.jpg"), mistake_type_plot, dpi = 300, height = 8, width = 12)
 
 mistake_type_plot
 ```
 
-The number of irrelevant responses.
+The number of missing or dropped responses.
 
 ```{r}
 processed %>% 
-  filter(mistake_type == "Irrelevant") %>%
+  filter(is.na(mistake_type)) %>%
   nrow()
-```
-
-This is the figure for all the responses. This will be presented in the supplementary materials.
-
-```{r}
-mistake_type_all_plot <-
-  mistake_type_plot_data %>% 
-  ggplot() +
-  aes(x = reorder(mistake_type, n), y = n) +
-  geom_bar(stat = "identity") +
-  geom_text(aes(label = paste0(percentage, "%")), size = 8, hjust = -0.3) +
-  labs(x = paste0("Which of the following data management mistake type\ncontributed the most to the retraction of your paper? (n =", unique(mistake_type_plot_data$N), ")"),
-       y = "Count") +
-  coord_flip() +
-  scale_y_continuous(expand = c(0,0), limit = c(0, y_max)) +
-  theme(
-    axis.ticks = element_line(color = "black"),
-    axis.line = element_line(color = "black"),
-    axis.text = element_text(color = "black", size = 18),
-    panel.background = element_blank(),
-    axis.title = element_text(size = 18),
-    plot.margin = unit(c(0,0.8,0,0), "cm")
-    )
-
-mistake_type_all_plot
 ```
 
 # What was the main cause of the data management mistake you identified above? 
 
-```{r}
+```{r causePlot, fig.path='../manuscript/figs/', dev=c('png', 'pdf'), fig.width=9, fig.height=6}
 mistake_cause_plot_data <-
   processed %>% 
   select(mistake_cause) %>% 
-  # Excluding irrelevant responses
-  filter(mistake_cause != "Irrelevant") %>% 
+  # Excluding missing and irrelevant responses
+  filter(!is.na(mistake_cause)) %>% 
   count(mistake_cause) %>% 
   ungroup() %>% 
   mutate(N = sum(n),
@@ -177,57 +117,34 @@ mistake_cause_plot <-
   geom_bar(stat = "identity") +
   geom_text(aes(label = paste0(percentage, "%")), size = 8, hjust = -0.3) +
   labs(x = paste0("What was the main cause of the\ndata management mistake you identified above?  (n =", unique(mistake_cause_plot_data$N), ")"),
-       y = "Count") +
+       y = "Number of responses") +
   coord_flip() +
   scale_y_continuous(expand = c(0,0), limit = c(0, y_max)) +
   theme(
     axis.ticks = element_line(color = "black"),
     axis.line = element_line(color = "black"),
-    axis.text = element_text(color = "black", size = 18),
+    axis.text = element_text(color = "black", size = 13),
     panel.background = element_blank(),
-    axis.title = element_text(size = 18),
+    axis.title = element_text(size = 15),
     plot.margin = unit(c(0,0.8,0,0), "cm")
     )
+
+ggsave(here::here("figures/mistake_cause_plot.jpg"), mistake_cause_plot, dpi = 300, height = 8, width = 12)
 
 mistake_cause_plot
 ```
 
-The number of irrelevant responses.
+The number of excluded and missing responses.
 
 ```{r}
 processed %>% 
-  filter(mistake_cause == "Irrelevant") %>%
+  filter(is.na(mistake_cause)) %>%
   nrow()
-```
-
-The plot including all the responses for the supplementary materials.
-
-```{r}
-mistake_cause_plot <-
-  mistake_cause_plot_data %>% 
-  ggplot() +
-  aes(x = reorder(mistake_cause, n), y = n) +
-  geom_bar(stat = "identity") +
-  geom_text(aes(label = paste0(percentage, "%")), size = 8, hjust = -0.3) +
-  labs(x = paste0("What was the main cause of the\ndata management mistake you identified above?  (n =", unique(mistake_cause_plot_data$N), ")"),
-       y = "Count") +
-  coord_flip() +
-  scale_y_continuous(expand = c(0,0), limit = c(0, y_max)) +
-  theme(
-    axis.ticks = element_line(color = "black"),
-    axis.line = element_line(color = "black"),
-    axis.text = element_text(color = "black", size = 18),
-    panel.background = element_blank(),
-    axis.title = element_text(size = 18),
-    plot.margin = unit(c(0,0.8,0,0), "cm")
-    )
-
-mistake_cause_plot
 ```
 
 # How much stress did you experience due to the retraction of the article?
 
-```{r}
+```{r stressPlot, fig.path='../manuscript/figs/', dev=c('png', 'pdf'), fig.width=9, fig.height=6}
 stress_plot_data <-
   processed %>% 
   select(stress) %>% 
@@ -237,15 +154,15 @@ stress_plot_data <-
     N = sum(n),
     percentage = round(n / N * 100, 0),
     stress = case_when(
-      stress == 0 ~ "No stress at all 0",
+      stress == 0 ~ "0\nNo stress at all",
       stress == 1 ~ "1",
       stress == 2 ~ "2",
       stress == 3 ~ "3",
       stress == 4 ~ "4",
       stress == 5 ~ "5",
-      stress == 6 ~ "6 Extreme stress"
+      stress == 6 ~ "6\nExtreme stress"
       ),
-    stress = factor(stress, levels = c("No stress at all 0" , "1" , "2" , "3" , "4" , "5" , "6 Extreme stress"))
+    stress = factor(stress, levels = c("0\nNo stress at all" , "1" , "2" , "3" , "4" , "5" , "6\nExtreme stress"))
     )
 
 y_max <- max(stress_plot_data$n) * 1.2
@@ -257,16 +174,18 @@ stress_plot <-
   geom_bar(stat = "identity") +
   geom_text(aes(label = paste0(percentage, "%")), size = 8, vjust = -0.3) +
   labs(x = paste0("How much stress did you experience due to the retraction of the article? (n =", unique(stress_plot_data$N), ")"),
-       y = "Count") +
+       y = "Number of responses") +
   scale_y_continuous(expand = c(0,0), limit = c(0, y_max)) +
   theme(
     axis.ticks = element_line(color = "black"),
     axis.line = element_line(color = "black"),
-    axis.text = element_text(color = "black", size = 18),
+    axis.text = element_text(color = "black", size = 13),
     panel.background = element_blank(),
-    axis.title = element_text(size = 18),
+    axis.title = element_text(size = 15),
     plot.margin = unit(c(0,0.8,0,0), "cm")
     )
+
+ggsave(here::here("figures/stress_plot.jpg"), stress_plot, dpi = 300, height = 5, width = 10)
 
 stress_plot
 ```
@@ -281,14 +200,13 @@ median(processed$stress, na.rm = TRUE)
 quantile(processed$stress, .25, na.rm = TRUE)
 
 # Quantile 75%
-quantile(processed$stress, .27, na.rm = TRUE)
+quantile(processed$stress, .75, na.rm = TRUE)
 ```
 
 # Did you change anything in your research workflow because of the retraction?
 
 ```{r}
-workflow_plot_data <-
-  processed %>% 
+processed %>% 
   select(workflow) %>% 
   count(workflow) %>% 
   ungroup() %>% 
@@ -296,26 +214,52 @@ workflow_plot_data <-
     N = sum(n),
     percentage = round(n / N * 100, 0)
     )
+```
 
-y_max <- max(workflow_plot_data$n) * 1.2
+# Exploring the relationship between error causes and types
 
-workflow_plot <-
-  workflow_plot_data %>% 
-  ggplot() +
-  aes(x = workflow, y = n) +
-  geom_bar(stat = "identity") +
-  geom_text(aes(label = paste0(percentage, "%")), size = 8, vjust = -0.3) +
-  labs(x = paste0("Did you change anything in your research workflow because of the retraction? (n =", unique(workflow_plot_data$N), ")"),
-       y = "Count") +
-  scale_y_continuous(expand = c(0,0), limit = c(0, y_max)) +
+We are only looking at the most frequently occuring causes for errors.
+
+```{r}
+mistake_cause_type_plot_data <-
+  processed %>% 
+  select(mistake_cause, mistake_type) %>% 
+  filter(!is.na(mistake_type)) |> 
+  # Excluding missing and irrelevant responses
+  filter(!is.na(mistake_cause)) %>% 
+  filter(mistake_cause %in% c("Inattention", "Technical issue", "Miscommunication", "Carelessness")) |> 
+  count(mistake_cause, mistake_type) %>% 
+  group_by(mistake_cause) |>
+  mutate(N = sum(n),
+         percentage = round(n / N * 100, 0)) %>% 
+  arrange(mistake_cause)
+
+# Number of all responses for this figure
+mistake_cause_type_plot_data |> ungroup() |> summarise(all = sum(n))
+
+mistake_cause_type_plot <-
+  ggplot(data = mistake_cause_type_plot_data,
+         aes(axis1 = mistake_cause, axis2 = mistake_type, y = n)) +
+  geom_alluvium(aes(fill = mistake_cause)) +
+  geom_stratum() +
+  geom_text(stat = "stratum", aes(label = after_stat(stratum))) +
+  scale_y_continuous(expand = c(0, 0)) +
+  labs(
+    x = "Error causes and types",
+    y = "Frequency"
+  ) +
+  theme_minimal() +
   theme(
-    axis.ticks = element_line(color = "black"),
-    axis.line = element_line(color = "black"),
-    axis.text = element_text(color = "black", size = 18),
-    panel.background = element_blank(),
-    axis.title = element_text(size = 18),
-    plot.margin = unit(c(0,0.8,0,0), "cm")
-    )
+    panel.grid = element_blank(),
+    axis.line.y = element_line(color = "black"),
+    axis.line.x = element_blank(),
+    legend.position = "none",
+    axis.text.x = element_blank(),
+    axis.title = element_text(size = 15),
+    axis.text.y = element_text(size = 12)
+  )
 
-workflow_plot
+ggsave(here::here("figures/mistake_cause_type_plot.jpg"), mistake_cause_type_plot, dpi = 300, height = 10, width = 15)
+
+mistake_cause_type_plot
 ```
