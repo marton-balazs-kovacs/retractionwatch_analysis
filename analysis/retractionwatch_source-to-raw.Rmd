@@ -59,13 +59,11 @@ The variables that have free-text response options are the following:
 * experience
 * comment
 
-Upon manual examination we did not find any identifying information in any of the questions with free-text response options.
-
 We originally wanted to delete the __comment__ variable from the raw data since we planned to ask only about the respondents willingness to do a followup qualitative interview regarding their experiences with the retraction. Since some of the respondents provided useful information in this variable we decided to delete the identifying information from the variable but to keep the rest of their responses. Rows where identifying information was deleted are flagged.
 
 There were some identifying information in the __experience__ variable as well. This variable will be modified as well similarly to the __comment__ variable.
 
-Deleting the identifying information was deleted manually from the raw dataset after it has been saved.
+Deleting the identifying information was done manually from the raw dataset after it has been saved.
 
 ```{r}
 source <-
@@ -89,7 +87,7 @@ source <-
   )
 ```
 
-However, we do delete the title of their study from the dataset which was collected as embeded data in Qualtrics.
+However, we do delete the title of their study from the dataset which was collected as embedded data in Qualtrics.
 
 ```{r}
 source <-

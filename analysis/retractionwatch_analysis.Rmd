@@ -144,7 +144,7 @@ processed |>
 
 # How much stress did you experience due to the retraction of the article?
 
-```{r stressPlot, fig.path='../manuscript/figs/', dev=c('png', 'pdf'), fig.width=9, fig.height=6}
+```{r stressPlot, fig.width=9, fig.height=6}
 stress_plot_data <-
   processed |> 
   select(stress) |> 

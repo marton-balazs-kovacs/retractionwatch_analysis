@@ -65,5 +65,5 @@ rand_lorem_ipsum <- function(n) {
 #' Function to simulate random values with ceiling
 rnorm_ceiling <- function(ceiling, ...) {
   rand_vec <- rnorm(...)
-  ifelse(rand_vec > ceiling, ceiling, rand_vec)
+  return(ifelse(rand_vec > ceiling, ceiling, rand_vec))
 }

@@ -7,7 +7,7 @@ editor_options:
   chunk_output_type: console
 ---
 
-```{r setup, include=FALSE}
+```{r setup, include=FALSE, message=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(here)
@@ -15,7 +15,7 @@ library(writexl)
 
 # Source R scripts
 r_scripts <- list.files(here::here("R/"), full.names = TRUE)
-purrr::walk(r_scripts, source)
+lapply(r_scripts, source)
 ```
 
 # Load data
@@ -37,7 +37,7 @@ raw <-
 # Exclusions
 ## Test data
 
-The survey was sent out on _sent_out_date_ to the participants. Thus, any responses in the dataset before that date are coming from the testing of the survey. These responses will be excluded from further analysis. We excluded `r raw %>% dplyr::filter(lubridate::as_date(start_date) < lubridate::as_date("2023-05-09")) %>% nrow()` test responses. 
+The survey was sent out on _2023-05-09_ to the participants. Thus, any responses in the dataset before that date are coming from the testing of the survey. These responses will be excluded from further analysis. We excluded `r raw %>% dplyr::filter(lubridate::as_date(start_date) < lubridate::as_date("2023-05-09")) %>% nrow()` test responses. 
 
 ```{r}
 raw <-
@@ -67,8 +67,6 @@ raw <-
 We only include full responses in the final analysis as preregistered. A response is considered complete if all the required questions are answered (variables _reason_mistake_, _mistake_type_, _mistake_cause_, and _stress_).
 
 We had to modify the preregistered code because it excluded cases where the participant responded "not at all" to reason_mistake. Although, later in the analysis we need these values even though the rest of the responses will be empty due to survey termination.
-
-TODO: Change has missing in a way to count for cases where the respondent choose the other option but did not provide a response: R_2eRNkGLXhavS7Jm or delete this case because it is not a data management error
 
 ```{r}
 raw <-
